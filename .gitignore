@@ -5,4 +5,4 @@ venv/
 *.db
 *.sqlite3
 .DS_Store
-.railway/
+*.bom
