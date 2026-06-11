@@ -1,4 +1,3 @@
-@'
 # Python
 __pycache__/
 *.pyc
@@ -9,11 +8,13 @@ venv/
 *.db
 *.sqlite3
 
-# Railway
-.railway/
-*.log
-
 # IDE
 .vscode/
 .idea/
-'@ | Out-File -FilePath .gitignore -Encoding UTF8
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Railway
+.railway/
