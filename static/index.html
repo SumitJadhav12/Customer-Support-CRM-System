@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support CRM | Ticket Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal-transition { transition: opacity 0.2s ease; }
+        body { background: #f8fafc; }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Support CRM</h1>
+                    <p class="text-gray-500 mt-1">Manage customer tickets efficiently</p>
+                </div>
+                <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    New Ticket
+                </button>
+            </div>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1 relative">
+                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" id="searchInput" placeholder="Search by name, ticket ID, email, subject..." class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+                <div class="w-full md:w-64">
+                    <select id="statusFilter" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 bg-white">
+                        <option value="all">All Status</option>
+                        <option value="Open">Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tickets List View -->
+        <div id="listView">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket ID</th>
+                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ticketsTableBody" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="6" class="text-center py-8 text-gray-400">Loading tickets...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail View (hidden initially) -->
+        <div id="detailView" class="hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-gray-800">Ticket Details</h2>
+                    <button onclick="showListView()" class="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        Back to List
+                    </button>
+                </div>
+                <div id="detailContent" class="p-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Ticket Modal -->
+    <div id="createModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 modal-transition">
+        <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-xl">
+            <div class="flex justify-between items-center p-6 border-b">
+                <h3 class="text-xl font-semibold">Create New Ticket</h3>
+                <button onclick="closeCreateModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <form id="createTicketForm" class="p-6 space-y-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label><input type="text" id="custName" required class="w-full px-3 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Email *</label><input type="email" id="custEmail" required class="w-full px-3 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Subject *</label><input type="text" id="subject" required class="w-full px-3 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Description *</label><textarea id="description" rows="3" required class="w-full px-3 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea></div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium">Create Ticket</button>
+                    <button type="button" onclick="closeCreateModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg font-medium">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let searchTimeout;
+        let currentTicketId = null;
+
+        // Helper: format date
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            return new Date(dateStr).toLocaleDateString();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        function getStatusBadge(status) {
+            const map = {
+                'Open': 'bg-blue-100 text-blue-700',
+                'In Progress': 'bg-yellow-100 text-yellow-700',
+                'Closed': 'bg-green-100 text-green-700'
+            };
+            return map[status] || 'bg-gray-100 text-gray-700';
+        }
+
+        // Load tickets with search & filter
+        async function loadTickets() {
+            const search = document.getElementById('searchInput').value;
+            const status = document.getElementById('statusFilter').value;
+            let url = '/api/tickets?';
+            if (status !== 'all') url += `status=${encodeURIComponent(status)}&`;
+            if (search) url += `search=${encodeURIComponent(search)}`;
+
+            try {
+                const res = await fetch(url);
+                const tickets = await res.json();
+                const tbody = document.getElementById('ticketsTableBody');
+                if (tickets.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No tickets found</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = tickets.map(t => `
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-6 py-4 font-mono text-sm font-medium text-gray-900">${t.ticket_id}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">${escapeHtml(t.customer_name)}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">${escapeHtml(t.subject)}</td>
+                        <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full font-medium ${getStatusBadge(t.status)}">${t.status}</span></td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${formatDate(t.created_at)}</td>
+                        <td class="px-6 py-4"><button onclick="viewTicket('${t.ticket_id}')" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm">View Details</button></td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+                document.getElementById('ticketsTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-500">Error loading tickets</td></tr>';
+            }
+        }
+
+        // View single ticket details
+        async function viewTicket(ticketId) {
+            currentTicketId = ticketId;
+            try {
+                const res = await fetch(`/api/tickets/${ticketId}`);
+                if (!res.ok) throw new Error('Ticket not found');
+                const ticket = await res.json();
+
+                document.getElementById('detailContent').innerHTML = `
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="text-xs text-gray-500 uppercase font-semibold">Ticket ID</label><p class="text-lg font-mono font-semibold">${ticket.ticket_id}</p></div>
+                            <div><label class="text-xs text-gray-500 uppercase font-semibold">Status</label>
+                                <select id="updateStatus" class="ml-2 px-3 py-1 border rounded-lg text-sm">
+                                    <option ${ticket.status === 'Open' ? 'selected' : ''}>Open</option>
+                                    <option ${ticket.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                    <option ${ticket.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-500 uppercase font-semibold">Customer</label><p class="font-medium">${escapeHtml(ticket.customer_name)}</p></div>
+                            <div><label class="text-xs text-gray-500 uppercase font-semibold">Email</label><p class="text-sm">${escapeHtml(ticket.customer_email)}</p></div>
+                            <div class="md:col-span-2"><label class="text-xs text-gray-500 uppercase font-semibold">Subject</label><p class="font-medium text-gray-800">${escapeHtml(ticket.subject)}</p></div>
+                            <div class="md:col-span-2"><label class="text-xs text-gray-500 uppercase font-semibold">Description</label><p class="bg-gray-50 p-3 rounded-lg">${escapeHtml(ticket.description)}</p></div>
+                            <div class="md:col-span-2"><label class="text-xs text-gray-500 uppercase font-semibold">Created / Updated</label><p class="text-sm text-gray-600">${formatDate(ticket.created_at)} • Last update: ${formatDate(ticket.updated_at)}</p></div>
+                        </div>
+                        <div class="border-t pt-4">
+                            <label class="text-xs text-gray-500 uppercase font-semibold block mb-2">Add Note / Comment</label>
+                            <textarea id="newNote" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="Add internal note or comment..."></textarea>
+                            <button onclick="updateTicketWithNote()" class="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-medium">Update Status & Add Note</button>
+                        </div>
+                        <div class="border-t pt-4">
+                            <h4 class="font-semibold mb-3">Notes History</h4>
+                            <div id="notesList" class="space-y-2 max-h-64 overflow-y-auto">
+                                ${ticket.notes && ticket.notes.length ? ticket.notes.map(n => `<div class="bg-gray-50 p-3 rounded-lg"><p class="text-sm">${escapeHtml(n.note_text)}</p><p class="text-xs text-gray-400 mt-1">${formatDate(n.created_at)}</p></div>`).join('') : '<p class="text-gray-400 text-sm">No notes yet.</p>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('listView').classList.add('hidden');
+                document.getElementById('detailView').classList.remove('hidden');
+            } catch (err) {
+                alert('Error loading ticket details');
+                showListView();
+            }
+        }
+
+        async function updateTicketWithNote() {
+            const newStatus = document.getElementById('updateStatus').value;
+            const note = document.getElementById('newNote').value;
+            try {
+                const res = await fetch(`/api/tickets/${currentTicketId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus, notes: note })
+                });
+                if (res.ok) {
+                    await viewTicket(currentTicketId);  // refresh detail view
+                    loadTickets();                      // refresh list
+                } else {
+                    alert('Update failed');
+                }
+            } catch (err) {
+                alert('Error updating ticket');
+            }
+        }
+
+        function showListView() {
+            document.getElementById('detailView').classList.add('hidden');
+            document.getElementById('listView').classList.remove('hidden');
+            loadTickets();
+        }
+
+        // Modal handling
+        function openCreateModal() {
+            document.getElementById('createModal').classList.remove('hidden');
+            document.getElementById('createModal').style.display = 'flex';
+        }
+        function closeCreateModal() {
+            document.getElementById('createModal').style.display = 'none';
+            document.getElementById('createTicketForm').reset();
+        }
+
+        document.getElementById('createTicketForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                customer_name: document.getElementById('custName').value,
+                customer_email: document.getElementById('custEmail').value,
+                subject: document.getElementById('subject').value,
+                description: document.getElementById('description').value
+            };
+            try {
+                const res = await fetch('/api/tickets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeCreateModal();
+                    loadTickets();
+                    alert('Ticket created successfully');
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + JSON.stringify(err));
+                }
+            } catch (err) {
+                alert('Failed to create ticket');
+            }
+        });
+
+        // Debounced search and filter
+        document.getElementById('searchInput').addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(loadTickets, 400);
+        });
+        document.getElementById('statusFilter').addEventListener('change', loadTickets);
+
+        // Initial load
+        loadTickets();
+    </script>
+</body>
+</html>
