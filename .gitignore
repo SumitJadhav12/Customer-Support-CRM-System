@@ -1,20 +1,8 @@
-# Python
 __pycache__/
 *.pyc
 venv/
 .env
-
-# Database
 *.db
 *.sqlite3
-
-# IDE
-.vscode/
-.idea/
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Railway
 .railway/

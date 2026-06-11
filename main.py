@@ -1,19 +1,19 @@
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field, validator
+from typing import Optional, List
 import sqlite3
 import os
 import re
 from datetime import datetime
-from typing import Optional, List
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, validator
 
 app = FastAPI(title="Support CRM System")
 
 # Ensure static directory exists
 os.makedirs("static", exist_ok=True)
 
-# ---------- Database Setup ----------
+# Database setup
 def get_db():
     conn = sqlite3.connect("tickets.db")
     conn.row_factory = sqlite3.Row
@@ -50,7 +50,7 @@ def init_db():
 
 init_db()
 
-# ---------- Helper: generate ticket ID like TKT-001 ----------
+# Helper: generate ticket ID
 def generate_ticket_id():
     conn = get_db()
     cursor = conn.execute("SELECT ticket_id FROM tickets")
@@ -66,60 +66,39 @@ def generate_ticket_id():
     next_num = max_num + 1
     return f"TKT-{next_num:03d}"
 
-# ---------- Pydantic Models ----------
+# Pydantic models
 class TicketCreate(BaseModel):
-    customer_name: str = Field(..., min_length=1, max_length=100)
-    customer_email: str = Field(..., min_length=1, max_length=100)
-    subject: str = Field(..., min_length=1, max_length=200)
+    customer_name: str = Field(..., min_length=1)
+    customer_email: str = Field(..., min_length=1)
+    subject: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
-
+    
     @validator("customer_email")
     def validate_email(cls, v):
         if "@" not in v or "." not in v:
-            raise ValueError("Invalid email address")
+            raise ValueError("Invalid email")
         return v
 
 class TicketUpdate(BaseModel):
     status: str
     notes: Optional[str] = None
-
+    
     @validator("status")
     def validate_status(cls, v):
         if v not in ["Open", "In Progress", "Closed"]:
             raise ValueError("Invalid status")
         return v
 
-class TicketResponse(BaseModel):
-    ticket_id: str
-    customer_name: str
-    customer_email: str
-    subject: str
-    description: str
-    status: str
-    created_at: str
-    updated_at: str
-    notes: Optional[List[dict]] = None
-
-class TicketListItem(BaseModel):
-    ticket_id: str
-    customer_name: str
-    subject: str
-    status: str
-    created_at: str
-
-# ---------- API Endpoints ----------
-@app.post("/api/tickets", response_model=dict)
+# API Endpoints
+@app.post("/api/tickets")
 async def create_ticket(ticket: TicketCreate):
     conn = get_db()
     ticket_id = generate_ticket_id()
     try:
-        conn.execute(
-            """
+        conn.execute("""
             INSERT INTO tickets (ticket_id, customer_name, customer_email, subject, description)
             VALUES (?, ?, ?, ?, ?)
-            """,
-            (ticket_id, ticket.customer_name, ticket.customer_email, ticket.subject, ticket.description),
-        )
+        """, (ticket_id, ticket.customer_name, ticket.customer_email, ticket.subject, ticket.description))
         conn.commit()
         return {"ticket_id": ticket_id, "created_at": datetime.now().isoformat()}
     except Exception as e:
@@ -128,88 +107,68 @@ async def create_ticket(ticket: TicketCreate):
     finally:
         conn.close()
 
-@app.get("/api/tickets", response_model=List[TicketListItem])
+@app.get("/api/tickets")
 async def list_tickets(
-    status: Optional[str] = Query(None, regex="^(Open|In Progress|Closed)$"),
-    search: Optional[str] = None,
+    status: Optional[str] = Query(None),
+    search: Optional[str] = None
 ):
     conn = get_db()
-    query = """
-        SELECT ticket_id, customer_name, subject, status, created_at
-        FROM tickets
-        WHERE 1=1
-    """
+    query = "SELECT ticket_id, customer_name, subject, status, created_at FROM tickets WHERE 1=1"
     params = []
-    if status:
+    
+    if status and status != "all":
         query += " AND status = ?"
         params.append(status)
+    
     if search:
         query += """ AND (
-            customer_name LIKE ? OR
-            ticket_id LIKE ? OR
-            customer_email LIKE ? OR
-            subject LIKE ? OR
-            description LIKE ?
+            customer_name LIKE ? OR ticket_id LIKE ? OR 
+            customer_email LIKE ? OR subject LIKE ? OR description LIKE ?
         )"""
         search_param = f"%{search}%"
         params.extend([search_param] * 5)
+    
     query += " ORDER BY created_at DESC"
-
+    
     cursor = conn.execute(query, params)
     tickets = cursor.fetchall()
     conn.close()
-    return [
-        {
-            "ticket_id": t["ticket_id"],
-            "customer_name": t["customer_name"],
-            "subject": t["subject"],
-            "status": t["status"],
-            "created_at": t["created_at"],
-        }
-        for t in tickets
-    ]
+    
+    return [dict(t) for t in tickets]
 
-@app.get("/api/tickets/{ticket_id}", response_model=TicketResponse)
+@app.get("/api/tickets/{ticket_id}")
 async def get_ticket(ticket_id: str):
     conn = get_db()
     ticket = conn.execute("SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
+        raise HTTPException(status_code=404, detail="Not found")
+    
     notes = conn.execute(
         "SELECT note_text, created_at FROM notes WHERE ticket_id = ? ORDER BY created_at DESC",
-        (ticket_id,),
+        (ticket_id,)
     ).fetchall()
     conn.close()
-
-    return {
-        "ticket_id": ticket["ticket_id"],
-        "customer_name": ticket["customer_name"],
-        "customer_email": ticket["customer_email"],
-        "subject": ticket["subject"],
-        "description": ticket["description"],
-        "status": ticket["status"],
-        "created_at": ticket["created_at"],
-        "updated_at": ticket["updated_at"],
-        "notes": [{"note_text": n["note_text"], "created_at": n["created_at"]} for n in notes],
-    }
+    
+    result = dict(ticket)
+    result["notes"] = [dict(n) for n in notes]
+    return result
 
 @app.put("/api/tickets/{ticket_id}")
 async def update_ticket(ticket_id: str, update: TicketUpdate):
     conn = get_db()
-    ticket = conn.execute("SELECT status FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
+    ticket = conn.execute("SELECT ticket_id FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
+        raise HTTPException(status_code=404, detail="Not found")
+    
     try:
         conn.execute(
             "UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE ticket_id = ?",
-            (update.status, ticket_id),
+            (update.status, ticket_id)
         )
         if update.notes and update.notes.strip():
             conn.execute(
                 "INSERT INTO notes (ticket_id, note_text) VALUES (?, ?)",
-                (ticket_id, update.notes.strip()),
+                (ticket_id, update.notes.strip())
             )
         conn.commit()
         return {"success": True, "updated_at": datetime.now().isoformat()}
@@ -219,9 +178,13 @@ async def update_ticket(ticket_id: str, update: TicketUpdate):
     finally:
         conn.close()
 
-# ---------- Serve Frontend ----------
-@app.get("/")
+# Serve frontend
+@app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
-    return FileResponse("static/index.html")
+    html_path = "static/index.html"
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return HTMLResponse("<h1>CRM System Running</h1><p>Frontend not found</p>")
 
+# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
