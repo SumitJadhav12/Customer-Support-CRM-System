@@ -149,3 +149,8 @@ async def serve_frontend():
     return HTMLResponse("<h1>CRM API Running</h1><p>Frontend not found. Ensure static/index.html exists.</p>")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
